@@ -17,6 +17,13 @@ function includeInSet(setValue, enumValue) {
     return ((1 << enumValue) | setValue);
 }
 
+var enumBFace = {
+    faceUp: 0,
+    faceDown: 1,
+    faceFront: 2,
+    faceRear: 3
+};
+
 var enumDimUnit = {
     duMM: 0,
     duInch: 1
@@ -222,7 +229,8 @@ var enumRejectType = {
     rjctEndSplit: 95,          //                                    95
     rjctKntDmSound: 96,        //                                    96
     rjctKntDmDead: 97,         //                                    97
-    rjctKntDmBark: 98          //                                    98
+    rjctKntDmBark: 98,         //                                    98
+    rjctxrCup: 99              //                                    99
 };
 
 var enumCutOffType = {
