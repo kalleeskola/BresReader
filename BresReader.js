@@ -1,11 +1,10 @@
 "use strict";
-
 /*
  *    Class BresReader
  *      Reads FinScan board result format from given byte stream.
  *      Revisions NT/XP  34-100  - 02/2013
- *                HD    101-139  - 06/2020
- *                NOVA  500-527  - 06/2020
+ *                HD    101-140  - 02/2021
+ *                NOVA  500-528  - 02/2021
  */
 
 var BresReader = (function () {
@@ -36,7 +35,7 @@ var BresReader = (function () {
     
     function ReadInitialFileInfo(reader) {
         var RevIDStr = ReadRevisionIDOld(reader);
-        var Revision = RevIDStr.substring(4,7);
+        var Revision = parseInt(RevIDStr.substring(4,7));
 
         var SpeciesStr = reader.readAnsiCharArray(12);
         var bNomTh = reader.readByte();
@@ -1091,7 +1090,20 @@ var BresReader = (function () {
         res.SweepCount = [];
         for (var i=1; i<=sweepCamCount; i++)
             res.SweepCount[i] = reader.readInteger();
+        
+        // Calculate real cam count from sweep array
+        if (res.ipCamCount == 0) {
+            for (var i=1; i<=camCount; i++) {
+                if (res.SweepCount[i] > 0)
+                    res.ipCamCount++;
+                else
+                    break;
+            }
+        }
+        
         res.SliceCount = reader.readInteger();
+        if (res.SliceCount == 0)
+            res.SliceCount = 128;  // ?
         
         res.SliceRGBiRImage = new Array(camCount+1);
         for (var c=1; c<=camCount; c++) {                              // cameras
@@ -1569,7 +1581,7 @@ var BresReader = (function () {
         return res;
     }
     
-    function readBD(reader) {
+    function readBD(reader, RevNr) {
         var res = {};
         res.Desc = reader.readShortString(30);     // doen't work correct for some reason
         reader.incOffset(1);  // Delphi offset
@@ -1601,13 +1613,22 @@ var BresReader = (function () {
         res.SplSTDecF = reader.readInteger();
         
         // RCT control
-        res.WidRoot   = reader.readInteger();
-        res.WidCenter = reader.readInteger();
-        res.WidTop    = reader.readInteger();
+        if ((RevNr < 140) || ((RevNr >= 500) && (RevNr < 528))) {
+            res.WidRoot   = reader.readInteger();
+            res.WidCenter = reader.readInteger();
+            res.WidTop    = reader.readInteger();
+        }
+        else {
+            res.WidRoot   = reader.readSingle();
+            res.WidCenter = reader.readSingle();
+            res.WidTop    = reader.readSingle();
+        }
         reader.incOffset(6*4);
         
         // Warp
-        reader.incOffset(5*4);
+        reader.incOffset(3*4);
+        res.CupDim = reader.readInteger();
+        reader.incOffset(4);
         
         // ThMeter values
         reader.incOffset(2*4);
@@ -2156,10 +2177,11 @@ var BresReader = (function () {
     }
     
     function FindSliceNum(x, Geom, StartSlice = 1) {
+        StartSlice = Math.max(1,StartSlice);
         var ip = StartSlice;
-        while ((Geom[ip].x < x) && (ip <= Geom.length))
+        while ((ip < Geom.length) && (Geom[ip].x < x))
             ip++;
-        
+            
         if (ip > StartSlice)
             return ip-1;
         else
@@ -2407,7 +2429,7 @@ var BresReader = (function () {
         
         var BDSize = reader.readInteger();
         var r2 = new DelphiByteStreamReader(buffer, reader.getOffset(), BDSize);  // use this to avoid reading too much/little
-        res.BD = readBD(r2);
+        res.BD = readBD(r2, Revision);
         reader.incOffset(BDSize);
         
         if (Revision < 82) {
@@ -2547,7 +2569,7 @@ var BresReader = (function () {
     // -------------------------------------------------------------------------
     BresReader.prototype.readBres = function(buffer) {
         var reader = new DelphiByteStreamReader(buffer);
-
+        
         var Revision = ReadInitialFileInfo(reader);
         if (Revision > 110) {
             var batchInfo = ReadBatchInfo(reader);
@@ -2566,7 +2588,7 @@ var BresReader = (function () {
             res.Board = ReadOptBoardRecFileStream(buffer, reader, Revision, 0);
             // ... rest is not implemented
         }
-
+        
         return res;
     }
     
